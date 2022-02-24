@@ -1,0 +1,12 @@
+{
+    "name": "Iconography ML",
+    "id": "",
+    "api": "1.0.0",
+    "main": "dist/code.js",
+    "ui": "dist/ui.html",
+    "menu": [
+        {"name": "Generate assets", "command": "annotation"},
+        {"name": "Export PascalVOC", "command": "dataset"}
+    ],
+    "editorType": ["figma"]
+}
