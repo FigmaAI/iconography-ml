@@ -6,23 +6,28 @@ const isComponent = (raw: BaseNode) => {
     } else return false;
 };
 
-function recursiveName(node: BaseNode, nodeType: string) {
-    if (node.parent == null) return;
-    if (node.type == nodeType) {
+function recursiveName(node: BaseNode, type: string) {
+    if (node.type == type) {
         const label = toAndroidResourceName(node.name);
         return label;
+    } else {
+        if (node.parent !== null) {
+            return recursiveName(node.parent, type);
+        }
     }
-    return recursiveName(node.parent, nodeType);
 }
 
 function extractComponent(raw: any, x: number, y: number) {
     const rect = raw.absoluteRenderBounds;
     const name = recursiveName(raw.mainComponent, 'COMPONENT_SET');
+    const remote: boolean = raw.mainComponent.remote;
+    console.log(raw.mainComponent);
 
     return {
         id: raw.id,
         bbox: [rect.x - x, rect.y - y, rect.width, rect.height],
         label: name,
+        remote: remote,
     };
 }
 

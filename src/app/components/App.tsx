@@ -1,9 +1,12 @@
 import * as React from 'react';
 import {Box, CircularProgress, Button} from '@mui/material';
 import JSZip from 'jszip';
-
+import axios from 'axios';
 import '../styles/ui.css';
 import {uint8ArrayToObjectURL} from './ImageHandling';
+
+import Predict from './Predict';
+import Connect from './Connect';
 
 declare function require(path: string): any;
 
@@ -12,7 +15,14 @@ const App = () => {
     const [mode, setMode] = React.useState(null);
     const [annotations, setAnnotations] = React.useState(null);
     const [assets, setAssets] = React.useState(null);
+    const [model, setModel] = React.useState(null);
+    const [classesDir, setClassesDir] = React.useState(null);
+    const [modelLayer, setModelLayer] = React.useState(null);
+    const [config, setConfig] = React.useState(null);
+    const [ableToPredict, setAbleToPredict] = React.useState(false);
     const exportButton = React.useRef<HTMLButtonElement>(null);
+    const newWindowObject = window as any;
+    let tf = newWindowObject.tf;
 
     interface Annotation {
         id: string;
@@ -25,6 +35,7 @@ const App = () => {
         id: string;
         bbox: number[];
         label: string;
+        remote?: boolean;
     }
     interface Asset {
         id: string;
@@ -34,6 +45,16 @@ const App = () => {
         data?: Uint8Array;
         components: Component[];
         base64?: string;
+    }
+    interface Model {
+        name: string;
+        model: string;
+        label_map: string;
+        saved_model_cli: {
+            boxes: number;
+            scores: number;
+            classes: number;
+        };
     }
 
     // 체크박스 전체 단일 개체 선택
@@ -57,6 +78,18 @@ const App = () => {
         else {
             setCheckItems([]);
         }
+    };
+
+    // 선택된 체크박스의 데이터만 전송
+
+    const handleProps = (ids: {id: string}[], assets: Asset[]) => {
+        let images: any[] = [];
+        ids.forEach((id) => {
+            const image = assets.filter((x) => x.id === id.id);
+            images.push(image[0]);
+        });
+
+        return images;
     };
 
     const createIDArray = (array: any[]) => {
@@ -170,6 +203,18 @@ const App = () => {
         });
         exportButton.current.disabled = false;
     };
+    const loadModel = async (model: Model) => {
+        try {
+            const loadedModel = await tf.loadGraphModel(model.model);
+            const classesDir = await axios.get(model.label_map);
+
+            setModel(loadedModel);
+            setClassesDir(classesDir.data);
+            setModelLayer(model.saved_model_cli);
+        } catch (e) {
+            console.log(e);
+        }
+    };
 
     React.useEffect(() => {
         // This is how we read messages sent from the plugin controller
@@ -187,8 +232,23 @@ const App = () => {
                 setAssets(dataset);
                 setCheckItems(createIDArray(dataset));
             }
+            if (pluginMessage.type === 'predict') {
+                const png = await pluginMessage.exportImages;
+                const current_model = await pluginMessage.current_model;
+                setMode('predict');
+                setAssets(png);
+                setCheckItems(createIDArray(png));
+                loadModel(current_model);
+            }
+            if (pluginMessage.type === 'model') {
+                const current_model = await pluginMessage.current_model;
+                setConfig(current_model);
+                setMode('model');
+            }
         };
     }, []);
+
+    const isReady = !!model && !!classesDir && !!assets;
 
     return (
         <div id="app">
@@ -346,6 +406,98 @@ const App = () => {
                         </button>
                     </footer>
                 </React.Fragment>
+            ) : null}
+            {mode === 'predict' ? (
+                !isReady ? (
+                    <React.Fragment>
+                        <Box
+                            p={2}
+                            sx={{display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%'}}
+                        >
+                            <CircularProgress />
+                        </Box>
+                    </React.Fragment>
+                ) : !ableToPredict ? (
+                    <React.Fragment>
+                        <div id="content">
+                            {assets.map((asset: Asset, index: number) => (
+                                <div key={index} className="export-item">
+                                    <label className="export-item__checkbox">
+                                        <input
+                                            type="checkbox"
+                                            id={asset.id}
+                                            className="checkbox"
+                                            onChange={(e) => handleSingleCheck(e.target.checked, asset.id)}
+                                            checked={
+                                                checkItems.filter((element) => element.id === asset.id).length > 0
+                                                    ? true
+                                                    : false
+                                            }
+                                        />
+                                    </label>
+                                    <div className="export-item__thumb">
+                                        <img
+                                            src={uint8ArrayToObjectURL(asset.data)}
+                                            onClick={() => {
+                                                parent.postMessage(
+                                                    {
+                                                        pluginMessage: {
+                                                            type: 'showLayer',
+                                                            id: asset.id,
+                                                        },
+                                                    },
+                                                    '*'
+                                                );
+                                            }}
+                                        />
+                                    </div>
+                                    <div className="type type--11-pos export-item__text">
+                                        <label htmlFor={asset.id}>{asset.path}</label>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                        <footer id="footer">
+                            <label className="selectAll__wrap">
+                                <input
+                                    type="checkbox"
+                                    className="checkbox"
+                                    id="selectAll"
+                                    onChange={(e) => handleAllCheck(e.target.checked, assets)}
+                                    checked={checkItems.length === assets.length ? true : false}
+                                />
+                            </label>
+                            <div className="type type--11-pos selectAll__label">
+                                <label htmlFor="selectAll">
+                                    {checkItems.length} / {assets.length}
+                                </label>
+                            </div>
+                            <button
+                                className="button button--primary"
+                                onClick={() => {
+                                    setAbleToPredict(true);
+                                }}
+                            >
+                                Next
+                            </button>
+                        </footer>
+                    </React.Fragment>
+                ) : (
+                    <React.Fragment>
+                        <Predict
+                            data={handleProps(checkItems, assets)}
+                            model={model}
+                            classesDir={classesDir}
+                            modelLayer={modelLayer}
+                            setAbleToPredict={setAbleToPredict}
+                        />
+                    </React.Fragment>
+                )
+            ) : null}
+            {mode === 'model' ? (
+                <Box p={2} sx={{display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%'}}>
+                    <Connect config={config} />
+                </Box>
             ) : null}
         </div>
     );

@@ -1,28 +1,8 @@
-import stringComparison from 'string-comparison';
 import {getOverlapSize} from 'overlap-area';
 
 export const uint8ArrayToObjectURL = (data: Uint8Array): string => {
     return URL.createObjectURL(new Blob([data], {type: 'image/png'}));
 };
-
-// const getPNGAssetsFromPluginMessage = async (
-//     pluginMessage: any
-// ): Promise<{id: string; path: string; data: Uint8Array; width: number; height: number; components: any[]}[]> => {
-//     let assets: any[] = [];
-//     let exports = pluginMessage.exportImages;
-//     console.log(exports);
-//     exports.forEach((item) => {
-//         assets.push({
-//             id: item.id,
-//             path: item.path,
-//             data: item.imageData,
-//             width: item.width,
-//             height: item.height,
-//             components: item.components,
-//         });
-//     });
-//     return assets;
-// };
 
 export const postAlert = (type: string, message: any) => {
     parent.postMessage(
@@ -92,6 +72,7 @@ const renderPredictions = (
             bbox[3] = maxY - minY;
 
             detectionObjects.push({
+                id: i,
                 class: classes[i],
                 label: getLabelByID(classesDir, classes[i]),
                 score: score.toFixed(4),
@@ -162,6 +143,7 @@ interface Component {
     id: string;
     bbox: number[];
     label: string;
+    remote: boolean;
 }
 
 interface Components extends Array<Component> {}
@@ -172,14 +154,12 @@ export interface Item {
     height: number;
     path: string;
     data: Uint8Array;
-    components: {id: string; bbox: number[]; label: string}[];
+    components: Components;
 }
 
 export interface Items extends Array<Item> {}
 
 //BoxMatcher 코드 시작
-
-const cosine = stringComparison.cosine;
 
 const boxArea = ([, , w, h]) => {
     return w * h;
@@ -205,41 +185,47 @@ const computeOverlappingArea = ([x1, y1, w1, h1], [x2, y2, w2, h2]) => {
 
 const computeIoU = (component, detection) => {
     const overlap = computeOverlappingArea(component.bbox, detection.bbox);
-    const union = boxArea(component.bbox) + boxArea(detection.bbox);
-
-    return overlap / (union - overlap);
+    const iou = overlap / boxArea(detection.bbox);
+    return iou;
 };
 
-// const compareSize = (component, detection) => {
-//     const overall = 360 * 640;
-//     const ads: number = Math.abs(boxArea(component.bbox) / overall - boxArea(detection.bbox) / overall);
-//     // console.log(ads);
-//     return ads;
-// };
-export const matchBoxes = (components, detections) => {
-    detections.forEach((detection) => {
-        components.forEach((component) => {
-            const iou = computeIoU(component, detection);
-            const similarity = cosine.similarity(component.label, detection.label);
+const pytha = (component, detection) => {
+    const x = Math.abs(component.bbox[0] - detection.bbox[0]);
+    const y = Math.abs(component.bbox[1] - detection.bbox[1]);
+    const length = Math.sqrt(Math.pow(x, 2) + Math.pow(y, 2));
+    return length;
+};
 
-            // check if two boxes overlapped and Check how similar the two labels of cosine are
-            if (iou >= 0.5) {
-                detection['iou'] = iou;
-                detection['labelSimilarity'] = similarity;
-                detection['design'] = component;
+export const matchBoxes = (components, detections) => {
+    const matchs = [...detections];
+    const finding = [];
+    for (let index = 0; index < matchs.length; index++) {
+        const match = matchs[index];
+
+        components.forEach((component) => {
+            const distance = pytha(component, match);
+            const iou = computeIoU(component, match);
+
+            if (distance < 50) {
+                if (iou > 0.1) {
+                    match['iou'] = iou;
+                    match['distance'] = distance;
+                    finding.push(match);
+                }
             }
         });
-    });
+    }
 
-    return detections;
+    return finding;
 };
 
-const drawCorrection = (matched) => {
-    const corrections: any = [];
+const drawCorrection = (detections: any[], matchs: any[]) => {
+    let corrections: any = [...detections];
 
-    matched.forEach((match) => {
-        !match.iou ? corrections.push(match) : match.labelSimilarity < 0.5 ? corrections.push(match) : null;
+    matchs.forEach((match) => {
+        corrections = corrections.filter((item) => item.id !== match.id);
     });
+
     return corrections;
 };
 
@@ -265,7 +251,15 @@ export const runPredict = async (
 
         const ratioX = c.width / width;
         const ratioY = c.height / height;
-        console.log('components: ', components);
+
+        // Remote Components만 골라서 추적하기
+        const remote = [];
+        components.forEach((component: Component) => {
+            if (component.remote) {
+                remote.push(component);
+            }
+        });
+        console.log('components: ', remote);
         drawBoxes(components, context, null, 2, '#FFA500', ratioX, ratioY);
 
         // Draw Prediction
@@ -284,8 +278,8 @@ export const runPredict = async (
         drawBoxes(detections, context, null, 2, '#00FFFF', null, null);
 
         // Matched designs and predictions
-        const matched = matchBoxes(components, detections);
-        const corrections = drawCorrection(matched);
+        const matchs = matchBoxes(components, detections);
+        const corrections = drawCorrection(detections, matchs);
         console.log('corrections: ', corrections);
         drawBoxes(corrections, context, font, null, '#FF0000');
     } catch (e) {
