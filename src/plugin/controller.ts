@@ -14,13 +14,13 @@ interface Model {
 
 const defaultModel: Model = {
     name: 'CLAY',
-    model: 'https://raw.githubusercontent.com/dusskapark/design-system-detector/master/icon/clay-mobilenetv2/web-model/model.json',
+    model: 'https://raw.githubusercontent.com/dusskapark/design-system-detector/master/icon/clay/models/mobilenetv2-8k/web-model/model.json',
     label_map:
-        'https://raw.githubusercontent.com/dusskapark/design-system-detector/master/icon/clay-mobilenetv2/web-model/label_map.json',
+        'https://raw.githubusercontent.com/dusskapark/design-system-detector/master/icon/clay/models/mobilenetv2-8k/web-model/label_map.json',
     saved_model_cli: {
-        boxes: 7,
-        scores: 5,
-        classes: 4,
+        boxes: 4,
+        scores: 7,
+        classes: 0,
     },
 };
 
@@ -346,7 +346,6 @@ async function main() {
         figma.ui.onmessage = async (msg) => {
             if (msg.type === 'config-model') {
                 const model_value = updateModel(msg.message);
-                console.log('plugin: ', model_value);
                 await figma.clientStorage.setAsync(filename, model_value);
                 figma.notify(`${model_value.name} is set as a model`, {timeout: 1000});
             }

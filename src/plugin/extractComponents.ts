@@ -21,7 +21,6 @@ function extractComponent(raw: any, x: number, y: number) {
     const rect = raw.absoluteRenderBounds;
     const name = recursiveName(raw.mainComponent, 'COMPONENT_SET');
     const remote: boolean = raw.mainComponent.remote;
-    console.log(raw.mainComponent);
 
     return {
         id: raw.id,
