@@ -108,7 +108,7 @@ const drawBoxes = (
 
         if (!font) {
             // Draw the bounding box.
-            context.strokeStyle = color || '#00FFFF';
+            context.strokeStyle = color || '#F5D35D';
             context.lineWidth = lineWidth || 4;
             context.strokeRect(x, y, width, height);
             return context;
@@ -122,15 +122,15 @@ const drawBoxes = (
 
             const textHeight = parseInt(font, 10) / 2; // base 10
             context.beginPath();
-            context.strokeStyle = color || '#00FFFF';
+            context.strokeStyle = color || '#F5D35D';
             context.arc(x + textHeight, y + textHeight, textHeight, 0, 2 * Math.PI);
 
             context.stroke();
-            context.fillStyle = color || '#00FFFF';
+            context.fillStyle = color || '#F5D35D';
             context.fill();
 
             // Draw the text last to ensure it's on top.
-            context.fillStyle = '#FFFFFF';
+            context.fillStyle = '#000000';
             const number = i + 1;
             context.fillText(number, x + textHeight, y + textHeight);
 
@@ -260,7 +260,7 @@ export const runPredict = async (
             }
         });
         console.log('components: ', remote);
-        drawBoxes(components, context, null, 2, '#FFA500', ratioX, ratioY);
+        drawBoxes(components, context, null, 2, '#6ddb79', ratioX, ratioY);
 
         // Draw Prediction
         postAlert('alert', 'Predicting...');
@@ -275,13 +275,13 @@ export const runPredict = async (
             modelLayer
         );
         console.log('interpreted: ', detections);
-        drawBoxes(detections, context, null, 2, '#00FFFF', null, null);
+        drawBoxes(detections, context, null, 2, '#F5D35D', null, null);
 
         // Matched designs and predictions
         const matchs = matchBoxes(components, detections);
         const corrections = drawCorrection(detections, matchs);
         console.log('corrections: ', corrections);
-        drawBoxes(corrections, context, font, null, '#FF0000');
+        drawBoxes(corrections, context, font, null, '#F5D35D');
     } catch (e) {
         console.log(e);
     }
