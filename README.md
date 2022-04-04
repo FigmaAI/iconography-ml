@@ -21,7 +21,7 @@ A project using [TensorFlow JS](https://www.tensorflow.org/js) to lint icons, th
 
 Convert the layer to be checked through `iconography-ml` to the Export layer and execute 'Predict icons'.
 </br>
-[IMG]
+![IMG](./public/iconography-ml2.gif)
 
 ## Contributors 
 
